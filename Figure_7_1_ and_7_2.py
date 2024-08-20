@@ -74,7 +74,7 @@ def get_ls(x,noise,a):
     ls = np.full(n_windows,np.nan)
 
     for i in tqdm.trange(n_windows):
-        frequencies = 2*np.pi*(1/window_length)*np.arange(1,window_length/2)                                                #here window_length should be even
+        frequencies = 2*np.pi*(1/window_length)*np.arange(1,window_length/2)                                                
 
         xs_window_detrend = statsmodels.tsa.tsatools.detrend(x[i*window_length:(i+1)*window_length],order=2)
         noise_window = noise[i*window_length:(i+1)*window_length]
@@ -105,7 +105,7 @@ true_ls = 1 - upper**2
 
 #numerical simulation of SDEs:
 
-steps_per_unit_time = 10                                                        #to have smaller dt / Andreas multiplied f with 0.2      
+steps_per_unit_time = 10                                                         
 solve_ts = np.linspace(0,T,T*steps_per_unit_time + 1)
 dt = 1/steps_per_unit_time
 
@@ -120,7 +120,7 @@ white_noise = np.random.normal(0,np.sqrt(dt),T*steps_per_unit_time + 1)
 
 
 for i in tqdm.trange(T*steps_per_unit_time):
-    xs_white[i+1] = xs_white[i] + 0.2*f(xs_white[i],solve_ts[i])*dt + sigma*white_noise[i]                                  #0.2 is new
+    xs_white[i+1] = xs_white[i] + 0.2*f(xs_white[i],solve_ts[i])*dt + sigma*white_noise[i]                                  
 
 
 
@@ -128,7 +128,7 @@ for i in tqdm.trange(T*steps_per_unit_time):
 
 xs_red = np.zeros(T*steps_per_unit_time+1)
 xs_red[0] = upper[0]                                                           
-kappa = 0.05                                                                    #shouldn't be too small 
+kappa = 0.05                                                                    
 
 def eta(theta):
     eta = np.zeros(T*steps_per_unit_time + 1)
