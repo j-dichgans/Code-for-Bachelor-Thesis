@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.integrate 
 import matplotlib.pyplot as plt
-import matplotlib.colors 
 import tqdm
 import scipy.signal
 import statsmodels.tsa.stattools
@@ -42,10 +41,8 @@ def get_equilibria_paths():
     return ts,upper,lower,unstable
 
 
-#version with var and ar over several time units
 
 def get_var(x):
-    #get var of T-windows with length window length. Gives n_windows values
     n_windows = int(T/window_length) 
     var = np.full(n_windows,np.nan)
     for i in tqdm.trange(n_windows):
@@ -53,8 +50,8 @@ def get_var(x):
     return var
 
 
+
 def get_ar(x):
-#x should have size T*steps_per_unit_time + 1
     n_windows = int(T/window_length) 
     ar = np.full(n_windows,np.nan)
     for i in tqdm.trange(n_windows):
@@ -62,7 +59,6 @@ def get_ar(x):
     return ar
 
 
-#ls version without convolution
 
 def get_ls(x,noise,a):
 
@@ -105,64 +101,57 @@ true_ls = 1 - upper**2
 
 #numerical simulation of SDEs:
 
-steps_per_unit_time = 10                                                         
-solve_ts = np.linspace(0,T,T*steps_per_unit_time + 1)
-dt = 1/steps_per_unit_time
+n_steps_per_unit_time = 10               
+n_steps = T*n_steps_per_unit_time + 1                                        
+solve_ts = np.linspace(0,T,n_steps)
+dt = 1/n_steps_per_unit_time
 
 
 #white noise case
 
-xs_white = np.zeros(T*steps_per_unit_time + 1)
+xs_white = np.zeros(n_steps)
 xs_white[0] = upper[0]
 
 sigma = 0.01
-white_noise = np.random.normal(0,np.sqrt(dt),T*steps_per_unit_time + 1)
+white_noise = np.random.normal(0,np.sqrt(dt),n_steps)
 
 
-for i in tqdm.trange(T*steps_per_unit_time):
+for i in tqdm.trange(n_steps - 1):
     xs_white[i+1] = xs_white[i] + 0.2*f(xs_white[i],solve_ts[i])*dt + sigma*white_noise[i]                                  
 
 
 
 #red noise case
 
-xs_red = np.zeros(T*steps_per_unit_time+1)
+xs_red = np.zeros(n_steps)
+red_noise = np.zeros(n_steps)
 xs_red[0] = upper[0]                                                           
-kappa = 0.05                                                                    
-
-def eta(theta):
-    eta = np.zeros(T*steps_per_unit_time + 1)
-    for i in tqdm.trange(T*steps_per_unit_time - 1):
-        eta[i+1] = np.exp(-theta*dt)*eta[i] + np.sqrt(1/(2*theta)*(1-np.exp(-2*theta*dt)))*np.random.normal(0,1)
-    return eta
-
-eta = eta(1)
+kappa = 0.05                   
 
 
-for i in tqdm.trange(T*steps_per_unit_time):
-    xs_red[i+1] = xs_red[i] + 0.2*f(xs_red[i],solve_ts[i])*dt + kappa*eta[i]*dt
+for i in tqdm.trange(n_steps - 1):
+    red_noise[i+1] = np.exp(-dt)*red_noise[i] + np.sqrt(1/2*(1-np.exp(-2*dt)))*np.random.normal(0,1)
 
 
+for i in tqdm.trange(n_steps - 1):
+    xs_red[i+1] = xs_red[i] + 0.2*f(xs_red[i],solve_ts[i])*dt + kappa*red_noise[i]*dt
 
-xs_white_filtered = xs_white[::steps_per_unit_time]
-xs_red_filtered = xs_red[::steps_per_unit_time]
 
+xs_white_filtered = xs_white[::n_steps_per_unit_time]
+xs_red_filtered = xs_red[::n_steps_per_unit_time]
+
+
+white_noise_filtered = np.array([np.sum([white_noise[i*n_steps_per_unit_time+j] for j in range(n_steps_per_unit_time)]) for i in range(T)])
+red_noise_filtered = np.array([np.sum([red_noise[i*n_steps_per_unit_time+j] for j in range(n_steps_per_unit_time)])*dt for i in range(T)])
 
 
 
-
-#version with var and ar over several time units
 
 variance_series_white = get_var(xs_white_filtered)
 variance_series_red = get_var(xs_red_filtered)
 ac_series_white = get_ar(xs_white_filtered)
 ac_series_red = get_ar(xs_red_filtered)
 
-
-
-
-white_noise_filtered = np.array([np.sum([white_noise[i*steps_per_unit_time+j] for j in range(steps_per_unit_time)]) for i in range(T)])
-red_noise_filtered = eta[::steps_per_unit_time]
 
 ls_white = get_ls(xs_white_filtered,white_noise_filtered,sigma)
 ls_red = get_ls(xs_red_filtered,red_noise_filtered,kappa)                         
@@ -173,10 +162,10 @@ ls_red = get_ls(xs_red_filtered,red_noise_filtered,kappa)
 
 xs_white_filt_detr = statsmodels.tsa.tsatools.detrend(xs_white_filtered[:1000],order = 2)
 
-mean_ls_500 = true_ls[:1000].mean()*0.2
+mean_ls_1000 = true_ls[:1000].mean()*0.2
 frequencies = 2*np.pi*(1/1000)*np.arange(1,500)
 
-target_psd_ratio = 1/(frequencies**2 + mean_ls_500**2)
+target_psd_ratio = 1/(frequencies**2 + mean_ls_1000**2)
 
 estim_psd_xs_wn = np.array([np.abs(1/np.sqrt(1000)*(np.exp(-1j*frequencies[i]*np.arange(0,1000)) @ xs_white_filt_detr))**2 for i in range(499)])
 estim_psd_xi_wn = np.array([np.abs(1/np.sqrt(1000)*(np.exp(-1j*frequencies[i]*np.arange(0,1000)) @ (white_noise_filtered[:1000]*sigma)))**2 for i in range(499)])
@@ -192,6 +181,8 @@ plt.xscale('log')
 plt.yscale('log')
 plt.xlabel('Frequencies')
 plt.legend()
+
+plt.show()
 
 
 #plot reimplementation of Clarke fig 1
@@ -210,8 +201,8 @@ fig,axs = plt.subplots(nrows=4,ncols=1,sharex=True,figsize=(8,10))
 axs[0].plot(ts[:tipp_upper],upper[:tipp_upper],color = "black")
 axs[0].plot(ts[tipp_lower:],lower[tipp_lower:],color = "black")
 axs[0].plot(ts[~np.isnan(unstable)],unstable[~np.isnan(unstable)],linestyle = "--")
-axs[0].plot(ts,xs_white_filtered,color="blue")
 axs[0].plot(ts,xs_red_filtered,color="red")
+axs[0].plot(ts,xs_white_filtered,color="blue")
 
 
 axs[1].plot(ts[window_length:tip_white:window_length],ac_series_white[:int(tip_white/window_length)],color="blue")                               
@@ -233,15 +224,18 @@ ax2_var.set_ylabel(r"Variance")
 
 
 axs[3].set_xlabel("t")    
-axs[3].plot(ts[window_length:tip_white:window_length],-ls_white[:int(tip_white/window_length)],color="blue")
-axs[3].plot(ts[window_length:tip_red:window_length],-ls_red[:int(tip_red/window_length)],color="red")
-axs[3].plot(ts[:tipp_upper],0.2*true_ls[:tipp_upper],color="black")
+axs[3].plot(ts[window_length:tip_white:window_length],ls_white[:int(tip_white/window_length)],color="blue")
+axs[3].plot(ts[window_length:tip_red:window_length],ls_red[:int(tip_red/window_length)],color="red")
+axs[3].plot(ts[:tipp_upper],-0.2*true_ls[:tipp_upper],color="black")
 axs[3].set_ylabel(r"$\lambda$")
 
 
 ax_0 = axs[0].twiny()
 ax_0.set_xlim(-1,1)
 ax_0.set_xlabel(r"$\mu(t)$")
+
+
+plt.show()
 
 
 
